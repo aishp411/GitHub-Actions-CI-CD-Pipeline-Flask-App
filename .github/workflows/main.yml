@@ -13,10 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
@@ -33,32 +33,47 @@ jobs:
     if: github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to Staging via SSH
-        uses: appleboy/ssh-action@v0.1.7
+      - name: Copy deploy.sh to EC2
+        uses: appleboy/scp-action@v0.1.5
         with:
           host: ${{ secrets.STAGING_IP }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
+          source: "deploy.sh"
+          target: "~/flask-app"
+
+      - name: Run deploy.sh on Staging
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.STAGING_IP }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            cd /home/ubuntu/flask-app
-            git pull origin staging
-            sudo systemctl restart flask-app.service
+            chmod +x ~/flask-app/deploy.sh
+            cd ~/flask-app
+            ./deploy.sh staging
 
   deploy-to-production:
     needs: build-and-test
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to Production via SSH
-        uses: appleboy/ssh-action@v0.1.7
+      - name: Copy deploy.sh to EC2
+        uses: appleboy/scp-action@v0.1.5
         with:
           host: ${{ secrets.PRODUCTION_IP }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
+          source: "deploy.sh"
+          target: "~/flask-app"
+
+      - name: Run deploy.sh on Production
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.PRODUCTION_IP }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            cd /home/ubuntu/flask-app
-            git fetch --tags
-            git checkout tags/${{ github.event.release.tag_name }}
-            sudo systemctl restart flask-app.service
+            chmod +x ~/flask-app/deploy.sh
+            cd ~/flask-app
+            ./deploy.sh production ${{ github.event.release.tag_name }}
