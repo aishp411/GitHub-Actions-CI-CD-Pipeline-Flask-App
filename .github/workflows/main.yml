@@ -28,7 +28,18 @@ jobs:
       - name: Run tests
         run: pytest
 
-   deploy-to-staging:
+      - name: Build the application
+        run: |
+          echo "Packaging Flask app..."
+          tar -czf flask_app.tar.gz *
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flask_app
+          path: flask_app.tar.gz
+
+  deploy-to-staging:
     needs: build-and-test
     if: github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
@@ -52,7 +63,6 @@ jobs:
             ./venv/bin/pip install --upgrade pip
             ./venv/bin/pip install -r requirements.txt
             nohup ./venv/bin/python flask_app.py > app.log 2>&1 &
-
 
   deploy-to-production:
     needs: build-and-test
