@@ -30,8 +30,7 @@ jobs:
 
       - name: Build the application
         run: |
-          echo "Packaging Flask app..."
-          tar -czf flask_app.tar.gz *
+          tar -czf flask_app.tar.gz app.py requirements.txt
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
