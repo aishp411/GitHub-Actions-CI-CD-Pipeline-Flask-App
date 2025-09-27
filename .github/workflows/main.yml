@@ -48,6 +48,15 @@ jobs:
         with:
           name: flask_app
 
+      - name: Upload artifact to EC2
+        uses: appleboy/scp-action@v0.1.5
+        with:
+          host: ${{ secrets.STAGING_IP }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: flask_app.tar.gz
+          target: ~/flask-staging
+
       - name: Deploy to Staging EC2
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -55,35 +64,48 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            sudo apt update
+            sudo apt install python3-venv -y
             mkdir -p ~/flask-staging
-            tar -xzf flask_app.tar.gz -C ~/flask-staging
             cd ~/flask-staging
+            tar -xzf flask_app.tar.gz
             python3 -m venv venv
             ./venv/bin/pip install --upgrade pip
             ./venv/bin/pip install -r requirements.txt
-            nohup ./venv/bin/python flask_app.py > app.log 2>&1 &
+            nohup ./venv/bin/python app.py > app.log 2>&1 &
 
   deploy-to-production:
     needs: build-and-test
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
     steps:
-      - name: Copy deploy.sh to EC2
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: flask_app
+
+      - name: Upload artifact to EC2
         uses: appleboy/scp-action@v0.1.5
         with:
           host: ${{ secrets.PRODUCTION_IP }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "deploy.sh"
-          target: "~/flask-app"
+          source: flask_app.tar.gz
+          target: ~/flask-prod
 
-      - name: Run deploy.sh on Production
+      - name: Run deployment on Production EC2
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.PRODUCTION_IP }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            chmod +x ~/flask-app/deploy.sh
-            cd ~/flask-app
-            ./deploy.sh production ${{ github.event.release.tag_name }}
+            sudo apt update
+            sudo apt install python3-venv -y
+            mkdir -p ~/flask-prod
+            cd ~/flask-prod
+            tar -xzf flask_app.tar.gz
+            python3 -m venv venv
+            ./venv/bin/pip install --upgrade pip
+            ./venv/bin/pip install -r requirements.txt
+            nohup ./venv/bin/python app.py > app.log 2>&1 &
